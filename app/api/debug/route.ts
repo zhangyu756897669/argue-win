@@ -70,9 +70,7 @@ export async function GET() {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${finalKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://argue-win.vercel.app',
-            'X-Title': 'Argue-Win-App',
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             model: model,
