@@ -43,7 +43,7 @@ export async function POST(req: Request) {
         'X-Title': 'Argue-Win-App',
       },
       body: JSON.stringify({
-        model: 'deepseek/deepseek-v3-base:free',
+        model: 'deepseek/deepseek-chat',
         messages: [
           {
             role: 'user',
