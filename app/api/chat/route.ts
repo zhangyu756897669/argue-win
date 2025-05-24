@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
 export async function POST(req: Request) {
   try {
@@ -19,7 +20,13 @@ export async function POST(req: Request) {
     if (!apiKey) {
       throw new Error('OpenRouter API key not found in environment variables');
     }
-    
+
+    // 使用OpenAI SDK调用OpenRouter
+    const openai = new OpenAI({
+      apiKey: apiKey,
+      baseURL: 'https://openrouter.ai/api/v1',
+    });
+
     // 简化的提示词，只要求5个简洁回复
     const prompt = `对方说："${message}"
 
@@ -32,39 +39,25 @@ export async function POST(req: Request) {
 回复4：你的第四条回复
 回复5：你的第五条回复`;
 
-    console.log('About to call OpenRouter API...');
+    console.log('About to call OpenRouter API via OpenAI SDK...');
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'deepseek/deepseek-chat',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: 500,
-        temperature: 0.7
-      })
+    const response = await openai.chat.completions.create({
+      model: 'deepseek/deepseek-chat',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: 500,
+      temperature: 0.7
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('API Error:', data);
-      throw new Error(data.error?.message || 'API call failed');
-    }
-
     console.log('API call successful!');
-    console.log('Response length:', data.choices[0]?.message?.content?.length);
-    console.log('Response content preview:', data.choices[0]?.message?.content?.substring(0, 200) + '...');
+    console.log('Response length:', response.choices[0]?.message?.content?.length);
+    console.log('Response content preview:', response.choices[0]?.message?.content?.substring(0, 200) + '...');
 
-    const responseContent = data.choices[0]?.message?.content;
+    const responseContent = response.choices[0]?.message?.content;
     
     if (!responseContent || responseContent.trim().length === 0) {
       throw new Error('API returned empty response');
