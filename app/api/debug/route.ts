@@ -34,6 +34,7 @@ export async function GET() {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${finalKey}`,
+        'Content-Type': 'application/json',
         'HTTP-Referer': 'https://argue-win.vercel.app',
         'X-Title': 'Argue-Win-App',
       }
