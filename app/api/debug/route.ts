@@ -53,33 +53,59 @@ export async function GET() {
       });
     }
 
-    // 如果models API成功，测试聊天API
-    const chatResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${finalKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://argue-win.vercel.app',
-        'X-Title': 'Argue-Win-App',
-      },
-      body: JSON.stringify({
-        model: 'deepseek/deepseek-chat',
-        messages: [{ role: 'user', content: 'Say "test success"' }],
-        max_tokens: 10
-      })
-    });
+    // 如果models API成功，测试多个聊天模型
+    const testModels = [
+      'deepseek/deepseek-chat',
+      'anthropic/claude-3-haiku:beta',
+      'google/gemma-7b-it:free',
+      'microsoft/wizardlm-2-8x22b',
+      'meta-llama/llama-3-8b-instruct:free'
+    ];
 
-    const chatData = await chatResponse.json();
+    const chatResults = [];
+    
+    for (const model of testModels) {
+      try {
+        const chatResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${finalKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://argue-win.vercel.app',
+            'X-Title': 'Argue-Win-App',
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [{ role: 'user', content: 'Say "test success"' }],
+            max_tokens: 10
+          })
+        });
+
+        const chatData = await chatResponse.json();
+        chatResults.push({
+          model,
+          status: chatResponse.status,
+          success: chatResponse.ok,
+          data: chatResponse.ok ? chatData.choices[0]?.message?.content : chatData.error?.message || 'Unknown error'
+        });
+        
+        // 如果找到一个成功的模型，就停止测试
+        if (chatResponse.ok) break;
+        
+      } catch (error) {
+        chatResults.push({
+          model,
+          error: error instanceof Error ? error.message : 'Request failed'
+        });
+      }
+    }
     
     return NextResponse.json({
       success: true,
       analysis: keyAnalysis,
       modelsAPI: { status: response.status, success: true },
-      chatAPI: { 
-        status: chatResponse.status, 
-        success: chatResponse.ok,
-        data: chatResponse.ok ? chatData.choices[0]?.message?.content : chatData
-      }
+      chatTests: chatResults,
+      recommendedModel: chatResults.find(r => r.success)?.model || 'none'
     });
     
   } catch (error: unknown) {
