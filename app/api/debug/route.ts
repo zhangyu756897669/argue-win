@@ -55,6 +55,7 @@ export async function GET() {
 
     // 如果models API成功，测试多个聊天模型
     const testModels = [
+      'deepseek/deepseek-v3-base:free',
       'deepseek/deepseek-chat',
       'anthropic/claude-3-haiku:beta',
       'google/gemma-7b-it:free',

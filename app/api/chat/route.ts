@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     console.log('About to call OpenRouter API via OpenAI SDK...');
 
     const response = await openai.chat.completions.create({
-      model: 'deepseek/deepseek-chat',
+      model: 'deepseek/deepseek-v3-base:free',
       messages: [
         {
           role: 'user',
