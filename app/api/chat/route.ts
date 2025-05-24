@@ -12,6 +12,8 @@ export async function POST(req: Request) {
     console.log('API Key exists:', !!apiKey);
     console.log('API Key length:', apiKey?.length);
     console.log('API Key prefix:', apiKey?.substring(0, 20) + '...');
+    console.log('Environment variable exists:', !!process.env.OPENROUTER_API_KEY);
+    console.log('Using fallback key:', !process.env.OPENROUTER_API_KEY);
     console.log('Request data:', { message: message?.substring(0, 50), intensity, context: context?.substring(0, 50) });
     
     if (!apiKey) {

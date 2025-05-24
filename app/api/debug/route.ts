@@ -4,51 +4,80 @@ export async function GET() {
   try {
     console.log('=== Debugging Environment ===');
     
-    // 检查环境变量，新密钥作为fallback
-    const envKey = process.env.OPENROUTER_API_KEY || "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";
+    // 检查环境变量
+    const envKey = process.env.OPENROUTER_API_KEY;
+    const fallbackKey = "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";
+    const finalKey = envKey || fallbackKey;
     
     // 详细的API密钥分析
     const keyAnalysis = {
-      exists: !!envKey,
-      length: envKey?.length || 0,
-      startsWithCorrectPrefix: envKey?.startsWith('sk-or-v1-') || false,
-      hasWhitespace: envKey ? /\s/.test(envKey) : false,
-      trimmedLength: envKey?.trim().length || 0,
-      firstChars: envKey?.substring(0, 15) || 'N/A',
-      lastChars: envKey?.substring(-10) || 'N/A'
+      envKeyExists: !!envKey,
+      envKeyLength: envKey?.length || 0,
+      finalKeyLength: finalKey?.length || 0,
+      startsWithCorrectPrefix: finalKey?.startsWith('sk-or-v1-') || false,
+      usingFallback: !envKey,
+      firstChars: finalKey?.substring(0, 20) || 'N/A',
     };
     
     console.log('Key Analysis:', keyAnalysis);
     
-    // 尝试清理API密钥
-    const cleanKey = envKey?.trim();
-    
-    if (!cleanKey) {
+    if (!finalKey) {
       return NextResponse.json({
         error: 'No API key found',
         analysis: keyAnalysis
       });
     }
-    
-    // 简单的认证测试
-    const testResponse = await fetch('https://openrouter.ai/api/v1/models', {
+
+    // 测试最简单的API调用
+    console.log('Testing OpenRouter API...');
+    const response = await fetch('https://openrouter.ai/api/v1/models', {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${cleanKey}`,
+        'Authorization': `Bearer ${finalKey}`,
         'HTTP-Referer': 'https://argue-win.vercel.app',
         'X-Title': 'Argue-Win-App',
       }
     });
+
+    const data = await response.json();
+    console.log('Models API response status:', response.status);
     
-    const testData = await testResponse.json();
+    if (!response.ok) {
+      return NextResponse.json({
+        success: false,
+        error: 'API key authentication failed',
+        status: response.status,
+        response: data,
+        analysis: keyAnalysis
+      });
+    }
+
+    // 如果models API成功，测试聊天API
+    const chatResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${finalKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://argue-win.vercel.app',
+        'X-Title': 'Argue-Win-App',
+      },
+      body: JSON.stringify({
+        model: 'deepseek/deepseek-chat',
+        messages: [{ role: 'user', content: 'Say "test success"' }],
+        max_tokens: 10
+      })
+    });
+
+    const chatData = await chatResponse.json();
     
     return NextResponse.json({
-      status: testResponse.status,
-      success: testResponse.ok,
+      success: true,
       analysis: keyAnalysis,
-      modelEndpointTest: {
-        status: testResponse.status,
-        data: testResponse.ok ? 'Authentication successful' : testData
+      modelsAPI: { status: response.status, success: true },
+      chatAPI: { 
+        status: chatResponse.status, 
+        success: chatResponse.ok,
+        data: chatResponse.ok ? chatData.choices[0]?.message?.content : chatData
       }
     });
     
