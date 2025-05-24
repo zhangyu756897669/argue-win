@@ -60,6 +60,13 @@ export default function Home() {
 
       // 解析回复内容，提取5条完整回复
       console.log('原始响应:', data.response); // 调试用
+      console.log('响应类型:', typeof data.response); // 调试用
+      console.log('完整data对象:', data); // 调试用
+      
+      // 检查响应是否有效
+      if (!data.response || typeof data.response !== 'string') {
+        throw new Error('API返回的响应格式无效');
+      }
       
       const fullText = data.response;
       const replyBlocks = [];

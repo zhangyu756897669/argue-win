@@ -62,9 +62,16 @@ export async function POST(req: Request) {
 
     console.log('API call successful!');
     console.log('Response length:', data.choices[0]?.message?.content?.length);
+    console.log('Response content preview:', data.choices[0]?.message?.content?.substring(0, 200) + '...');
+
+    const responseContent = data.choices[0]?.message?.content;
+    
+    if (!responseContent || responseContent.trim().length === 0) {
+      throw new Error('API returned empty response');
+    }
 
     return NextResponse.json({ 
-      response: data.choices[0]?.message?.content || '生成失败'
+      response: responseContent
     });
 
   } catch (error: any) {
