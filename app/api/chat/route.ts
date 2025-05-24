@@ -3,12 +3,17 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
-  apiKey: "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",
+  apiKey: process.env.OPENROUTER_API_KEY || "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",
 });
 
 export async function POST(req: Request) {
   try {
     const { message, intensity, context } = await req.json();
+    
+    // 检查API Key是否配置
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.warn('OPENROUTER_API_KEY not found, using fallback key');
+    }
     
     const prompt = `作为一个吵架高手，请根据以下信息生成5条吵架回复：
     对方说的话：${message}
