@@ -17,12 +17,10 @@ export default function Home() {
   const [intensity, setIntensity] = useState(5);
   const [context, setContext] = useState('');
   const [responses, setResponses] = useState<string[]>([]);
-  const [currentResponse, setCurrentResponse] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<ChatHistory[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
 
   // 从 localStorage 加载历史记录
   useEffect(() => {
@@ -42,10 +40,8 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setIsStreaming(true);
     setError('');
     setResponses([]);
-    setCurrentResponse('');
 
     try {
       const response = await fetch('/api/chat', {
@@ -56,77 +52,78 @@ export default function Home() {
         body: JSON.stringify({ message, intensity, context }),
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error('生成回复失败');
+        throw new Error(data.error || '生成回复失败');
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedResponse = '';
-
-      if (reader) {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            
-            if (done) break;
-            
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  
-                  if (data.error) {
-                    throw new Error(data.error);
-                  }
-                  
-                  if (data.done) {
-                    setIsStreaming(false);
-                    setLoading(false);
-                    
-                    // 解析并保存最终回复
-                    const formattedResponses = accumulatedResponse
-                      .split('\n')
-                      .filter((line: string) => line.trim() && line.includes('回复'))
-                      .map((line: string) => line.trim());
-                    
-                    setResponses(formattedResponses);
-                    setCurrentResponse('');
-
-                    // 保存到历史记录
-                    const newEntry: ChatHistory = {
-                      id: Date.now().toString(),
-                      message,
-                      intensity,
-                      context,
-                      responses: formattedResponses,
-                      timestamp: Date.now()
-                    };
-                    saveToHistory(newEntry);
-                    return;
-                  }
-                  
-                  if (data.content) {
-                    accumulatedResponse += data.content;
-                    setCurrentResponse(accumulatedResponse);
-                  }
-                } catch (parseError) {
-                  console.error('Parse error:', parseError);
-                }
-              }
-            }
+      // 解析回复内容，提取5条完整回复
+      console.log('原始响应:', data.response); // 调试用
+      
+      const fullText = data.response;
+      const replyBlocks = [];
+      
+      // 按回复分割文本
+      const parts = fullText.split(/回复\d+：/);
+      
+      // 第一部分通常是空的或者是前言，从第二部分开始
+      for (let i = 1; i < parts.length && replyBlocks.length < 5; i++) {
+        const content = parts[i].trim();
+        if (content) {
+          // 清理内容，去掉多余的换行和空白
+          const cleanContent = content
+            .split('\n')
+            .filter((line: string) => line.trim())
+            .join(' ')
+            .trim();
+          
+          if (cleanContent) {
+            replyBlocks.push(`回复${i}：${cleanContent}`);
           }
-        } finally {
-          reader.releaseLock();
         }
       }
+      
+      // 如果没有找到标准格式，尝试其他解析方式
+      if (replyBlocks.length === 0) {
+        const lines = fullText.split('\n').filter((line: string) => line.trim());
+        let currentReply = '';
+        let replyCount = 0;
+        
+        for (const line of lines) {
+          if (line.match(/^回复\d+/)) {
+            if (currentReply && replyCount < 5) {
+              replyBlocks.push(currentReply.trim());
+              replyCount++;
+            }
+            currentReply = line;
+          } else if (currentReply) {
+            currentReply += ' ' + line.trim();
+          }
+        }
+        
+        // 添加最后一个回复
+        if (currentReply && replyCount < 5) {
+          replyBlocks.push(currentReply.trim());
+        }
+      }
+      
+      setResponses(replyBlocks.length > 0 ? replyBlocks : ['生成的回复格式有误，请重试']);
+
+      // 保存到历史记录
+      const newEntry: ChatHistory = {
+        id: Date.now().toString(),
+        message,
+        intensity,
+        context,
+        responses: replyBlocks,
+        timestamp: Date.now()
+      };
+      saveToHistory(newEntry);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : '发生错误');
-      setIsStreaming(false);
+    } finally {
       setLoading(false);
     }
   };
@@ -152,37 +149,8 @@ export default function Home() {
     setIntensity(entry.intensity);
     setContext(entry.context);
     setResponses(entry.responses);
-    setCurrentResponse('');
     setShowHistory(false);
   };
-
-  // 解析当前流式响应并显示
-  const parseCurrentResponse = () => {
-    if (!currentResponse.trim()) return [];
-    
-    const lines = currentResponse.split('\n').filter(line => line.trim());
-    const parsedResponses: string[] = [];
-    let currentReply = '';
-    
-    for (const line of lines) {
-      if (line.match(/^回复[1-5]：/)) {
-        if (currentReply) {
-          parsedResponses.push(currentReply);
-        }
-        currentReply = line;
-      } else if (currentReply) {
-        currentReply += line;
-      }
-    }
-    
-    if (currentReply) {
-      parsedResponses.push(currentReply);
-    }
-    
-    return parsedResponses;
-  };
-
-  const currentStreamingResponses = parseCurrentResponse();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100">
@@ -297,7 +265,7 @@ export default function Home() {
               {loading ? (
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  {isStreaming ? 'AI 正在生成回复...' : 'AI 正在思考中...'}
+                  AI 正在生成回复...
                 </div>
               ) : (
                 '🚀 开始吵架'
@@ -316,29 +284,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* 流式回复结果 */}
-        {(isStreaming && currentStreamingResponses.length > 0) && (
-          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <span className="mr-2">⚡</span>
-              AI 正在生成回复...
-              <span className="ml-2 animate-pulse">|</span>
-            </h3>
-            <div className="space-y-4">
-              {currentStreamingResponses.map((response, index) => (
-                <div
-                  key={index}
-                  className="p-4 bg-gradient-to-r from-pink-50 to-rose-50 rounded-xl border-l-4 border-pink-400 animate-pulse"
-                >
-                  <p className="text-gray-800 leading-relaxed">{response}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 最终回复结果 */}
-        {responses.length > 0 && !isStreaming && (
+        {/* 回复结果 */}
+        {responses.length > 0 && (
           <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
               <span className="mr-2">💎</span>

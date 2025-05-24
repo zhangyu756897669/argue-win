@@ -1,85 +1,81 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
-
-const client = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY || "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",
-});
 
 export async function POST(req: Request) {
   try {
     const { message, intensity, context } = await req.json();
     
-    // 检查API Key是否配置
-    if (!process.env.OPENROUTER_API_KEY) {
-      console.warn('OPENROUTER_API_KEY not found, using fallback key');
+    // 获取并清理API Key，新密钥作为fallback
+    const rawApiKey = process.env.OPENROUTER_API_KEY || "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";
+    const apiKey = rawApiKey?.trim();
+    
+    console.log('=== API Debug Info ===');
+    console.log('API Key exists:', !!apiKey);
+    console.log('API Key length:', apiKey?.length);
+    console.log('API Key prefix:', apiKey?.substring(0, 20) + '...');
+    console.log('Request data:', { message: message?.substring(0, 50), intensity, context: context?.substring(0, 50) });
+    
+    if (!apiKey) {
+      throw new Error('OpenRouter API key not found in environment variables');
     }
     
-    const prompt = `作为一个吵架高手，请根据以下信息生成5条吵架回复：
-    对方说的话：${message}
-    语气强度（1-10）：${intensity}
-    上下文：${context || '无'}
-    
-    要求：
-    1. 回复要符合语气强度（1为温和建议，10为极具攻击性）
-    2. 保持上下文的连贯性
-    3. 每条回复都要犀利且有理有据
-    4. 用中文回复
-    5. 每条回复分别用"回复1："、"回复2："、"回复3："、"回复4："、"回复5："标记
-    6. 每条回复要简洁有力，不超过50字`;
+    // 简化的提示词，只要求5个简洁回复
+    const prompt = `对方说："${message}"
 
-    const stream = await client.chat.completions.create({
-      model: "deepseek/deepseek-chat",
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      stream: true
-    }, {
+请生成5条简洁的反击回复（语气强度${intensity}/10），每条回复不超过20字。
+请按以下格式输出，每条回复都在同一行：
+
+回复1：你的第一条回复
+回复2：你的第二条回复
+回复3：你的第三条回复
+回复4：你的第四条回复
+回复5：你的第五条回复`;
+
+    console.log('About to call OpenRouter API...');
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
       headers: {
-        "HTTP-Referer": "https://argue-win.vercel.app",
-        "X-Title": "Argue-Win-App",
-      }
-    });
-
-    const encoder = new TextEncoder();
-    
-    const customReadable = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of stream) {
-            const content = chunk.choices[0]?.delta?.content || '';
-            if (content) {
-              const data = `data: ${JSON.stringify({ content })}\n\n`;
-              controller.enqueue(encoder.encode(data));
-            }
-          }
-          
-          // 发送结束信号
-          const endData = `data: ${JSON.stringify({ done: true })}\n\n`;
-          controller.enqueue(encoder.encode(endData));
-          controller.close();
-        } catch (error) {
-          console.error('Stream error:', error);
-          const errorData = `data: ${JSON.stringify({ error: 'Stream failed' })}\n\n`;
-          controller.enqueue(encoder.encode(errorData));
-          controller.close();
-        }
-      }
-    });
-
-    return new Response(customReadable, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://argue-win.vercel.app',
+        'X-Title': 'Argue-Win-App',
       },
+      body: JSON.stringify({
+        model: 'deepseek/deepseek-v3-base:free',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: 500,
+        temperature: 0.7
+      })
     });
 
-  } catch (error) {
-    console.error('Error:', error);
-    return NextResponse.json({ error: 'Failed to generate response' }, { status: 500 });
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('API Error:', data);
+      throw new Error(data.error?.message || 'API call failed');
+    }
+
+    console.log('API call successful!');
+    console.log('Response length:', data.choices[0]?.message?.content?.length);
+
+    return NextResponse.json({ 
+      response: data.choices[0]?.message?.content || '生成失败'
+    });
+
+  } catch (error: any) {
+    console.error('=== API Error Details ===');
+    console.error('Error message:', error?.message);
+    console.error('Error type:', error?.constructor?.name);
+    console.error('Full error:', error);
+    
+    return NextResponse.json({ 
+      error: 'Failed to generate response',
+      details: error?.message || 'Unknown error'
+    }, { status: 500 });
   }
 } 
