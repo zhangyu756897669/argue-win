@@ -65,12 +65,12 @@ export async function GET() {
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Test error:', error);
     return NextResponse.json({
       success: false,
-      error: error.message,
-      details: error
+      error: error instanceof Error ? error.message : 'Unknown error',
+      details: error instanceof Error ? { message: error.message, stack: error.stack } : error
     });
   }
 } 

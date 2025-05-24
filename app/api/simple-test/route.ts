@@ -42,10 +42,10 @@ export async function GET() {
       data: data
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Simple test error:', error);
     return NextResponse.json({
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 } 

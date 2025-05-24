@@ -48,19 +48,19 @@ export async function GET() {
           data: response.ok ? data.choices[0]?.message?.content : data.error?.message
         });
 
-      } catch (error: any) {
+      } catch (error: unknown) {
         results.push({
           model,
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     }
 
     return NextResponse.json({ results });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 } 

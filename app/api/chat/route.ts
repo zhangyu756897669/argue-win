@@ -74,15 +74,17 @@ export async function POST(req: Request) {
       response: responseContent
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('=== API Error Details ===');
-    console.error('Error message:', error?.message);
-    console.error('Error type:', error?.constructor?.name);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorName = error instanceof Error ? error.constructor.name : 'UnknownError';
+    console.error('Error message:', errorMessage);
+    console.error('Error type:', errorName);
     console.error('Full error:', error);
     
     return NextResponse.json({ 
       error: 'Failed to generate response',
-      details: error?.message || 'Unknown error'
+      details: errorMessage
     }, { status: 500 });
   }
 } 
