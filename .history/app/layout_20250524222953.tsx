@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import StagewiseToolbarWrapper from "./components/stagewise-toolbar";
 
 export const metadata: Metadata = {
   title: "吵架包赢 - AI 智能回怼神器",
@@ -47,7 +46,6 @@ export default function RootLayout({
       </head>
       <body>
         {children}
-        <StagewiseToolbarWrapper />
       </body>
     </html>
   );

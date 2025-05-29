@@ -47,7 +47,6 @@ export default function RootLayout({
       </head>
       <body>
         {children}
-        <StagewiseToolbarWrapper />
       </body>
     </html>
   );
